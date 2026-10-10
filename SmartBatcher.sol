@@ -42,9 +42,7 @@ contract SmartBatcher {
                         (success, outputs[i]) = SELF.delegatecall(memoryData);
                         if (!dismissRevert) require(success, CallFailed(outputs[i]));
                     // ConcatCalldata
-                    } else {
-                        memoryData = bytes.concat(memoryData, input);
-                    }
+                    } else memoryData = bytes.concat(memoryData, input);
                 }
             } else {
                 if (command < 6) {
@@ -55,12 +53,8 @@ contract SmartBatcher {
                         uint64 end = uint64(bytes8(input[12 : 20]));
                         memoryData = bytes.concat(memoryData, _concatBySlice(start, end, outputs[index]));
                     // Clear
-                    } else {
-                        memoryData = new bytes(0);
-                    }
-                } else {
-                    revert InvalidCommand(command);
-                }
+                    } else memoryData = new bytes(0);
+                } else revert InvalidCommand(command);
             }
             unchecked { ++i; }
         }
