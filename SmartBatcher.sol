@@ -8,10 +8,24 @@ contract SmartBatcher {
 
     address immutable SELF = address(this);
 
+    bool transient executionActive;
+    bool transient selfCallEntry;
+
+    modifier authenticationAccess() {
+        if (!executionActive) {
+            executionActive = true;
+            _;
+            executionActive = false;
+        } else if (selfCallEntry) {
+            selfCallEntry = false;
+            _;
+        }
+    }
+
     function smartBatch(
         bytes calldata commands,
         bytes[] calldata inputs
-    ) external payable returns (bytes[] memory outputs) {
+    ) external payable authenticationAccess returns (bytes[] memory outputs) {
         require(commands.length == inputs.length);
         outputs = new bytes[](_getAllocate(commands));
         bytes memory memoryData;
@@ -39,7 +53,9 @@ contract SmartBatcher {
                     // SelfCall
                     if (command < 3) {
                         bool dismissRevert = input[0] != 0;
+                        selfCallEntry = true;
                         (success, outputs[i]) = SELF.delegatecall(memoryData);
+                        selfCallEntry = false;
                         if (!dismissRevert) require(success, CallFailed(outputs[i]));
                     // ConcatCalldata
                     } else memoryData = bytes.concat(memoryData, input);
