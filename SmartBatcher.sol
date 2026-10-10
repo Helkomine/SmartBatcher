@@ -16,25 +16,69 @@ contract SmartBatcher {
         Invalid
     }
 
-    function smartBatch(bytes calldata commands, bytes[] calldata inputs) external payable {
+    function smartBatch(
+        bytes calldata commands,
+        bytes[] calldata inputs
+    ) external payable returns (bytes[] memory outputs) {
         require(commands.length == inputs.length);
-        bytes[] memory memoryData = new bytes[](inputs.length);
+        outputs = new bytes[](inputs.length);
+        bytes memory memoryData;
         for (uint256 i = 0 ; i < commands.length ; ) {
+            bool success;
             uint8 command = uint8(commands[i]);
-            // MemoryStaticCall
             if (command < 4) {
                 if (command < 2) {
-                    if (command < 1) {} else {}
+                    // Call
+                    if (command < 1) {
+                        address target = address(bytes20(inputs[i][0 : 20]));
+                        uint64 value = uint64(bytes8(inputs[i][20 : 28]));
+                        bool dismissRevert = inputs[i][28] != 0;
+                        bytes calldata data = inputs[i][29 : ];
+                        (success, outputs[i]) = target.call{value : value}(data);
+                        if (!dismissRevert) require(success, CallFailed(outputs[i]));
+                    // StaticCall
+                    } else {
+                        address target = address(bytes20(inputs[i][0 : 20]));
+                        bool dismissRevert = inputs[i][20] != 0;
+                        bytes calldata data = inputs[i][21 : ];
+                        (success, outputs[i]) = target.staticcall(data);
+                        if (!dismissRevert) require(success, CallFailed(outputs[i]));
+                    }
                 } else {
-                    if (command < 3) {} else {}
+                    // SelfCall
+                    if (command < 3) {
+                        bool dismissRevert = inputs[i][0] != 0;
+                        bytes calldata data = inputs[i][1 : ];
+                        (success, outputs[i]) = SELF.delegatecall(data);
+                        if (!dismissRevert) require(success, CallFailed(outputs[i]));
+                    // MemoryCall
+                    } else {
+                        address target = address(bytes20(inputs[i][0 : 20]));
+                        uint64 value = uint64(bytes8(inputs[i][20 : 28]));
+                        bool dismissRevert = inputs[i][28] != 0;
+                        (success, outputs[i]) = target.call{value : value}(memoryData);
+                        if (!dismissRevert) require(success, CallFailed(outputs[i]));
+                    }
                 }
             } else {
                 if (command < 6) {
-                    if (command < 5) {} else {}
+                    // MemoryStaticCall
+                    if (command < 5) {
+                        address target = address(bytes20(inputs[i][0 : 20]));
+                        bool dismissRevert = inputs[i][20] != 0;
+                        (success, outputs[i]) = target.staticcall(memoryData);
+                        if (!dismissRevert) require(success, CallFailed(outputs[i]));
+                    // MemorySelfCall
+                    } else {
+                        bool dismissRevert = inputs[i][0] != 0;
+                        (success, outputs[i]) = SELF.delegatecall(memoryData);
+                        if (!dismissRevert) require(success, CallFailed(outputs[i]));
+                    }
                 } else {
                     if (command < 7) {
                         //(uint256 index, uint256 destOffset, uint256 offset, uint256 length) =
                         abi.decode(inputs[i], (uint256, uint256, uint256, uint256));
+                        assembly ("memory-safe") {}
                     } else {
                         revert();
                     }
