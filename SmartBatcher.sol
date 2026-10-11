@@ -27,12 +27,23 @@ contract SmartBatcher {
         bytes calldata commands,
         bytes[] calldata inputs
     ) external payable authenticationAccess returns (bytes[] memory outputs) {
-        require(commands.length == inputs.length, LengthMismatch());
-        outputs = new bytes[](_getAllocate(commands));
+        unchecked {
+            uint256 inputLength;
+            uint256 outputLength;
+            for (uint256 i = 0 ; i < commands.length ; ) {
+                uint8 command = uint8(commands[i]);
+                if (command < 3) ++outputLength;
+                else if (command < 5) ++inputLength;
+                ++i;
+            }
+            require(inputs.length == inputLength, LengthMismatch());
+            outputs = new bytes[](outputLength);
+        }
         bytes memory memoryData;
-        for (uint256 i = 0 ; i < commands.length ; ) {
-            uint8 command = uint8(commands[i]);
-            bytes calldata input = inputs[i];
+        uint256 inputIndex;
+        uint256 outputIndex;
+        for (uint256 loop = 0 ; loop < commands.length ; ) {
+            uint8 command = uint8(commands[loop]);
             if (command < 4) {
                 if (command < 2) {
                     // Call
@@ -47,11 +58,9 @@ contract SmartBatcher {
                             dismissRevert := shr(248, mload(add(offset, 28)))
                         }
                         bool success;
-                        unchecked {
-                            (success, outputs[i]) = target.call{value : value}
-                            (_slice(29, memoryData.length - 29, memoryData));
-                        }
-                        if (!dismissRevert) require(success, CallFailed(outputs[i]));
+                        (success, outputs[outputIndex]) = target.call{value : value}(_slice(29, memoryData.length, memoryData));
+                        if (!dismissRevert) require(success, CallFailed(outputs[outputIndex]));
+                        unchecked { ++outputIndex; }
                     // StaticCall
                     } else {
                         address target;
@@ -62,11 +71,9 @@ contract SmartBatcher {
                             dismissRevert := shr(248, mload(add(offset, 20)))
                         }
                         bool success;
-                        unchecked {
-                            (success, outputs[i]) = target.staticcall
-                            ((_slice(21, memoryData.length - 21, memoryData)));
-                        }
-                        if (!dismissRevert) require(success, CallFailed(outputs[i]));
+                        (success, outputs[outputIndex]) = target.staticcall((_slice(21, memoryData.length, memoryData)));
+                        if (!dismissRevert) require(success, CallFailed(outputs[outputIndex]));
+                        unchecked { ++outputIndex; }
                     }
                 } else {
                     // SelfCall
@@ -74,28 +81,30 @@ contract SmartBatcher {
                         bool dismissRevert = (memoryData[0] != 0);
                         selfCallEntry = true;
                         bool success;
-                        unchecked {
-                            (success, outputs[i]) = SELF.delegatecall
-                            ((_slice(1, memoryData.length - 1, memoryData)));
-                        }
+                        (success, outputs[outputIndex]) = SELF.delegatecall((_slice(1, memoryData.length, memoryData)));
                         selfCallEntry = false;
-                        if (!dismissRevert) require(success, CallFailed(outputs[i]));
+                        if (!dismissRevert) require(success, CallFailed(outputs[outputIndex]));
+                        unchecked { ++outputIndex; }
                     // Input
-                    } else memoryData = bytes.concat(memoryData, input);
+                    } else {
+                        memoryData = bytes.concat(memoryData, inputs[inputIndex]);
+                        unchecked { ++inputIndex; }
+                    }
                 }
             } else {
                 if (command < 6) {
                     // Output
                     if (command < 5) {
-                        uint24 index = uint24(bytes3(input[0 : 3]));
-                        uint24 start = uint24(bytes3(input[3 : 6]));
-                        uint24 end = uint24(bytes3(input[6 : 9]));
+                        uint24 index = uint24(bytes3(inputs[inputIndex][0 : 3]));
+                        uint24 start = uint24(bytes3(inputs[inputIndex][3 : 6]));
+                        uint24 end = uint24(bytes3(inputs[inputIndex][6 : 9]));
                         memoryData = bytes.concat(memoryData, _slice(start, end, outputs[index]));
+                        unchecked { ++inputIndex; }
                     // Clear
                     } else memoryData = new bytes(0);
                 } else revert InvalidCommand(command);
             }
-            unchecked { ++i; }
+            unchecked { ++loop; }
         }
     }
 
@@ -107,15 +116,6 @@ contract SmartBatcher {
             mstore(output, length)
             mcopy(add(output, 0x20), add(add(input, 0x20), start), length)
             mstore(0x40, and(add(length, 31), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff))
-        }
-    }
-
-    function _getAllocate(bytes calldata commands) internal pure returns (uint256 length) {
-        for (uint256 i = 0 ; i < commands.length ; ) {
-            unchecked {
-                if (uint8(commands[i]) < 3) ++length;
-                ++i;
-            }
         }
     }
 }
