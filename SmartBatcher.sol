@@ -54,7 +54,7 @@ contract SmartBatcher {
                         assembly ("memory-safe") {
                             let offset := add(memoryData, 0x20)
                             target := shr(96, mload(offset))
-                            value := shr(64, mload(add(offset, 20)))
+                            value := shr(192, mload(add(offset, 20)))
                             dismissRevert := shr(248, mload(add(offset, 28)))
                         }
                         bool success;
