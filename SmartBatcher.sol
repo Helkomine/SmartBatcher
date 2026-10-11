@@ -117,4 +117,7 @@ contract SmartBatcher {
             mstore(0x40, and(add(length, 31), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff))
         }
     }
+
+    receive() external payable {}
+    fallback() external payable {}
 }
