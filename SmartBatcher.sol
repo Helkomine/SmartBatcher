@@ -57,7 +57,7 @@ contract SmartBatcher {
                         bool dismissRevert = input[0] != 0;
                         selfCallEntry = true;
                         bool success;
-                        (success, outputs[i]) = SELF.delegatecall(memoryData);
+                        (success, outputs[i]) = SELF.delegatecall(bytes.concat(this.smartBatch.selector, memoryData));
                         selfCallEntry = false;
                         if (!dismissRevert) require(success, CallFailed(outputs[i]));
                     // ConcatCalldata
