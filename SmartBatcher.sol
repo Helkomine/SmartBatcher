@@ -49,40 +49,38 @@ contract SmartBatcher {
                     if (command < 1) {
                         address target;
                         uint64 value;
-                        bool dismissRevert;
+                        bool required = (memoryData[28] != 0);
                         assembly ("memory-safe") {
                             let offset := add(memoryData, 0x20)
                             target := shr(96, mload(offset))
                             value := shr(192, mload(add(offset, 20)))
-                            dismissRevert := shr(248, mload(add(offset, 28)))
                         }
                         bool success;
                         (success, outputs[outputIndex]) = target.call{value : value}(_slice(29, memoryData.length, memoryData));
-                        if (!dismissRevert) require(success, CallFailed(outputs[outputIndex]));
+                        if (!required) require(success, CallFailed(outputs[outputIndex]));
                         unchecked { ++outputIndex; }
                     // StaticCall
                     } else {
                         address target;
-                        bool dismissRevert;
+                        bool required = (memoryData[20] != 0);
                         assembly ("memory-safe") {
                             let offset := add(memoryData, 0x20)
                             target := shr(96, mload(offset))
-                            dismissRevert := shr(248, mload(add(offset, 20)))
                         }
                         bool success;
                         (success, outputs[outputIndex]) = target.staticcall((_slice(21, memoryData.length, memoryData)));
-                        if (!dismissRevert) require(success, CallFailed(outputs[outputIndex]));
+                        if (!required) require(success, CallFailed(outputs[outputIndex]));
                         unchecked { ++outputIndex; }
                     }
                 } else {
                     // SelfCall
                     if (command < 3) {
-                        bool dismissRevert = (memoryData[0] != 0);
+                        bool required = (memoryData[0] != 0);
                         selfCallEntry = true;
                         bool success;
                         (success, outputs[outputIndex]) = SELF.delegatecall((_slice(1, memoryData.length, memoryData)));
                         selfCallEntry = false;
-                        if (!dismissRevert) require(success, CallFailed(outputs[outputIndex]));
+                        if (!required) require(success, CallFailed(outputs[outputIndex]));
                         unchecked { ++outputIndex; }
                     // Input
                     } else {
