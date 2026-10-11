@@ -108,8 +108,7 @@ contract SmartBatcher {
     function _slice(uint256 start, uint256 end, bytes memory input) internal pure returns (bytes memory output) {
         uint256 length = end - start;
         assembly ("memory-safe") {
-            let ptr := mload(0x40)
-            output := ptr
+            output := mload(0x40)
             mstore(output, length)
             mcopy(add(output, 0x20), add(add(input, 0x20), start), length)
             mstore(0x40, and(add(length, 31), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff))
