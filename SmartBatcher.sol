@@ -31,10 +31,9 @@ contract SmartBatcher {
             uint256 inputLength;
             uint256 outputLength;
             for (uint256 i = 0 ; i < commands.length ; ) {
-                uint8 command = uint8(commands[i]);
+                uint8 command = uint8(commands[i++]);
                 if (command < 3) ++outputLength;
                 else if (command < 5) ++inputLength;
-                ++i;
             }
             require(inputs.length == inputLength, LengthMismatch());
             outputs = new bytes[](outputLength);
