@@ -37,40 +37,60 @@ contract SmartBatcher {
                 if (command < 2) {
                     // Call
                     if (command < 1) {
-                        address target = address(bytes20(input[0 : 20]));
-                        uint64 value = uint64(bytes8(input[20 : 28]));
-                        bool dismissRevert = input[28] != 0;
+                        address target;
+                        uint64 value;
+                        bool dismissRevert;
+                        assembly ("memory-safe") {
+                            let offset := add(memoryData, 0x20)
+                            target := shr(96, mload(offset))
+                            value := shr(64, mload(add(offset, 20)))
+                            dismissRevert := shr(248, mload(add(offset, 28)))
+                        }
                         bool success;
-                        (success, outputs[i]) = target.call{value : value}(memoryData);
+                        unchecked {
+                            (success, outputs[i]) = target.call{value : value}
+                            (_slice(29, memoryData.length - 29, memoryData));
+                        }
                         if (!dismissRevert) require(success, CallFailed(outputs[i]));
                     // StaticCall
                     } else {
-                        address target = address(bytes20(input[0 : 20]));
-                        bool dismissRevert = input[20] != 0;
+                        address target;
+                        bool dismissRevert;
+                        assembly ("memory-safe") {
+                            let offset := add(memoryData, 0x20)
+                            target := shr(96, mload(offset))
+                            dismissRevert := shr(248, mload(add(offset, 20)))
+                        }
                         bool success;
-                        (success, outputs[i]) = target.staticcall(memoryData);
+                        unchecked {
+                            (success, outputs[i]) = target.staticcall
+                            ((_slice(21, memoryData.length - 21, memoryData)));
+                        }
                         if (!dismissRevert) require(success, CallFailed(outputs[i]));
                     }
                 } else {
                     // SelfCall
                     if (command < 3) {
-                        bool dismissRevert = input[0] != 0;
+                        bool dismissRevert = (memoryData[0] != 0);
                         selfCallEntry = true;
                         bool success;
-                        (success, outputs[i]) = SELF.delegatecall(bytes.concat(this.smartBatch.selector, memoryData));
+                        unchecked {
+                            (success, outputs[i]) = SELF.delegatecall
+                            ((_slice(1, memoryData.length - 1, memoryData)));
+                        }
                         selfCallEntry = false;
                         if (!dismissRevert) require(success, CallFailed(outputs[i]));
-                    // ConcatCalldata
+                    // Input
                     } else memoryData = bytes.concat(memoryData, input);
                 }
             } else {
                 if (command < 6) {
-                    // ConcatOutput
+                    // Output
                     if (command < 5) {
-                        uint32 index = uint32(bytes4(input[0 : 4]));
-                        uint64 start = uint64(bytes8(input[4 : 12]));
-                        uint64 end = uint64(bytes8(input[12 : 20]));
-                        memoryData = bytes.concat(memoryData, _concatBySlice(start, end, outputs[index]));
+                        uint24 index = uint24(bytes3(input[0 : 3]));
+                        uint24 start = uint24(bytes3(input[3 : 6]));
+                        uint24 end = uint24(bytes3(input[6 : 9]));
+                        memoryData = bytes.concat(memoryData, _slice(start, end, outputs[index]));
                     // Clear
                     } else memoryData = new bytes(0);
                 } else revert InvalidCommand(command);
@@ -79,11 +99,7 @@ contract SmartBatcher {
         }
     }
 
-    function _concatBySlice(
-        uint256 start,
-        uint256 end,
-        bytes memory input
-    ) internal pure returns (bytes memory output) {
+    function _slice(uint256 start, uint256 end, bytes memory input) internal pure returns (bytes memory output) {
         uint256 length = end - start;
         assembly ("memory-safe") {
             let ptr := mload(0x40)
