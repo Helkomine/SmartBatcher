@@ -3,8 +3,9 @@ pragma solidity ^0.8.30;
 /// @author Helkomine (@Helkomine)
 
 contract SmartBatcher {
-    error CallFailed(bytes reason);
+    error LengthMismatch();
     error InvalidCommand(uint8 command);
+    error CallFailed(bytes reason);
 
     address immutable SELF = address(this);
 
@@ -26,11 +27,10 @@ contract SmartBatcher {
         bytes calldata commands,
         bytes[] calldata inputs
     ) external payable authenticationAccess returns (bytes[] memory outputs) {
-        require(commands.length == inputs.length);
+        require(commands.length == inputs.length, LengthMismatch());
         outputs = new bytes[](_getAllocate(commands));
         bytes memory memoryData;
         for (uint256 i = 0 ; i < commands.length ; ) {
-            bool success;
             uint8 command = uint8(commands[i]);
             bytes calldata input = inputs[i];
             if (command < 4) {
@@ -40,12 +40,14 @@ contract SmartBatcher {
                         address target = address(bytes20(input[0 : 20]));
                         uint64 value = uint64(bytes8(input[20 : 28]));
                         bool dismissRevert = input[28] != 0;
+                        bool success;
                         (success, outputs[i]) = target.call{value : value}(memoryData);
                         if (!dismissRevert) require(success, CallFailed(outputs[i]));
                     // StaticCall
                     } else {
                         address target = address(bytes20(input[0 : 20]));
                         bool dismissRevert = input[20] != 0;
+                        bool success;
                         (success, outputs[i]) = target.staticcall(memoryData);
                         if (!dismissRevert) require(success, CallFailed(outputs[i]));
                     }
@@ -54,6 +56,7 @@ contract SmartBatcher {
                     if (command < 3) {
                         bool dismissRevert = input[0] != 0;
                         selfCallEntry = true;
+                        bool success;
                         (success, outputs[i]) = SELF.delegatecall(memoryData);
                         selfCallEntry = false;
                         if (!dismissRevert) require(success, CallFailed(outputs[i]));
