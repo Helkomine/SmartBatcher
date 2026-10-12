@@ -10,15 +10,15 @@ contract SmartBatcher {
     address immutable SELF = address(this);
 
     bool transient executionActive;
-    bool transient selfCallEntry;
+    bool transient subCallEntry;
 
     modifier authenticationAccess() {
         if (!executionActive) {
             executionActive = true;
             _;
             executionActive = false;
-        } else if (selfCallEntry) {
-            selfCallEntry = false;
+        } else if (subCallEntry) {
+            subCallEntry = false;
             _;
         }
     }
@@ -73,13 +73,13 @@ contract SmartBatcher {
                         unchecked { ++outputIndex; }
                     }
                 } else {
-                    // SelfCall
+                    // SubCall
                     if (command < 3) {
                         bool required = (memoryData[0] != 0);
-                        selfCallEntry = true;
+                        subCallEntry = true;
                         bool success;
                         (success, outputs[outputIndex]) = SELF.delegatecall((_slice(1, memoryData.length, memoryData)));
-                        selfCallEntry = false;
+                        subCallEntry = false;
                         if (!required) require(success, CallFailed(outputs[outputIndex]));
                         unchecked { ++outputIndex; }
                     // Input
