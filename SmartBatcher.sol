@@ -43,6 +43,7 @@ contract SmartBatcher {
         uint256 outputIndex;
         for (uint256 loop = 0 ; loop < commands.length ; ) {
             uint8 command = uint8(commands[loop]);
+            unchecked { ++loop; }
             if (command < 4) {
                 if (command < 2) {
                     // Call
@@ -101,7 +102,6 @@ contract SmartBatcher {
                     } else memoryData = new bytes(0);
                 } else revert InvalidCommand(command);
             }
-            unchecked { ++loop; }
         }
     }
 
