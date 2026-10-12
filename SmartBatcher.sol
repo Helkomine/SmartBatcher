@@ -12,7 +12,7 @@ contract SmartBatcher {
     bool transient executionActive;
     bool transient subCallEntry;
 
-    modifier authenticationAccess() {
+    modifier validateAccess() {
         if (!executionActive) {
             executionActive = true;
             _;
@@ -26,7 +26,7 @@ contract SmartBatcher {
     function smartBatch(
         bytes calldata commands,
         bytes[] calldata inputs
-    ) external payable authenticationAccess returns (bytes[] memory outputs) {
+    ) external payable validateAccess returns (bytes[] memory outputs) {
         unchecked {
             uint256 inputLength;
             uint256 outputLength;
