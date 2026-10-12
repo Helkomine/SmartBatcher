@@ -97,6 +97,10 @@ contract SmartBatcher {
                         uint24 index = uint24(bytes3(input[0 : 3]));
                         uint24 start = uint24(bytes3(input[3 : 6]));
                         uint24 end = uint24(bytes3(input[6 : 9]));
+                        if (start == end) {
+                            start = 0;
+                            end = uint24(outputs[index].length);
+                        }
                         memoryData = bytes.concat(memoryData, _slice(start, end, outputs[index]));
                         unchecked { ++inputIndex; }
                     // Clear
