@@ -94,6 +94,7 @@ contract SmartBatcher {
                     // Output
                     if (command < 5) {
                         bytes calldata input = inputs[inputIndex];
+                        unchecked { ++inputIndex; }
                         uint24 index = uint24(bytes3(input[0 : 3]));
                         uint24 start = uint24(bytes3(input[3 : 6]));
                         uint24 end = uint24(bytes3(input[6 : 9]));
@@ -102,9 +103,15 @@ contract SmartBatcher {
                             end = uint24(outputs[index].length);
                         }
                         memoryData = bytes.concat(memoryData, _slice(start, end, outputs[index]));
+                    // ResetInput
+                    } else {
+                        bytes calldata input = inputs[inputIndex];
                         unchecked { ++inputIndex; }
-                    // Clear
-                    } else memoryData = new bytes(0);
+                        assembly ("memory-safe") {
+                            mstore(memoryData, input.length)
+                            calldatacopy(add(memoryData, 0x20), input.offset, input.length)
+                        }
+                    }
                 } else revert InvalidCommand(command);
             }
         }
