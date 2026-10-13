@@ -81,9 +81,9 @@ contract SmartBatcher {
                         subCallEntry = true;
                         bool success;
                         (success, outputs[outputIndex]) = SELF.delegatecall((_slice(1, memoryData.length, memoryData)));
+                        if (!required) require(success, CallFailed(outputs[outputIndex]));
                         require(outputs[outputIndex].length > 0, InvalidSubFrame());
                         subCallEntry = false;
-                        if (!required) require(success, CallFailed(outputs[outputIndex]));
                         unchecked { ++outputIndex; }
                     // Input
                     } else {
