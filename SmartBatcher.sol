@@ -49,16 +49,15 @@ contract SmartBatcher {
                     // Call
                     if (command < 1) {
                         address target;
-                        uint64 value;
-                        bool required;
+                        uint256 value;
+                        bool required = memoryData[52] != 0;
                         assembly ("memory-safe") {
                             let offset := add(memoryData, 0x20)
                             target := shr(96, mload(offset))
-                            value := shr(193, mload(add(offset, 20)))
-                            required := and(byte(27, mload(offset)), 1)
+                            value := mload(add(offset, 20))
                         }
                         bool success;
-                        (success, outputs[outputIndex]) = target.call{value : value}(_slice(29, memoryData.length, memoryData));
+                        (success, outputs[outputIndex]) = target.call{value : value}(_slice(53, memoryData.length, memoryData));
                         if (!required) require(success, CallFailed(outputs[outputIndex]));
                         unchecked { ++outputIndex; }
                     // StaticCall
