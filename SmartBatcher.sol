@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 
 contract SmartBatcher {
     error LengthMismatch();
+    error InvalidSubFrame();
     error InvalidCommand(uint8 command);
     error CallFailed(bytes reason);
 
@@ -80,6 +81,7 @@ contract SmartBatcher {
                         subCallEntry = true;
                         bool success;
                         (success, outputs[outputIndex]) = SELF.delegatecall((_slice(1, memoryData.length, memoryData)));
+                        require(outputs[outputIndex].length > 0, InvalidSubFrame());
                         subCallEntry = false;
                         if (!required) require(success, CallFailed(outputs[outputIndex]));
                         unchecked { ++outputIndex; }
