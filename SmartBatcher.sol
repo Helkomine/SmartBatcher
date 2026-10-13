@@ -33,7 +33,7 @@ contract SmartBatcher {
             for (uint256 i = 0 ; i < commands.length ; ) {
                 uint8 command = uint8(commands[i++]);
                 if (command < 3) ++outputLength;
-                else if (command < 5) ++inputLength;
+                else ++inputLength;
             }
             require(inputs.length == inputLength, LengthMismatch());
             outputs = new bytes[](outputLength);
@@ -105,12 +105,8 @@ contract SmartBatcher {
                         memoryData = bytes.concat(memoryData, _slice(start, end, outputs[index]));
                     // ResetInput
                     } else {
-                        bytes calldata input = inputs[inputIndex];
+                        memoryData = inputs[inputIndex];
                         unchecked { ++inputIndex; }
-                        assembly ("memory-safe") {
-                            mstore(memoryData, input.length)
-                            calldatacopy(add(memoryData, 0x20), input.offset, input.length)
-                        }
                     }
                 } else revert InvalidCommand(command);
             }
