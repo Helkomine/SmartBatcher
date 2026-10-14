@@ -42,6 +42,7 @@ contract SmartBatcher {
         bytes memory memoryData;
         uint256 inputIndex;
         uint256 outputIndex;
+        bool useOutput;
         for (uint256 loop = 0 ; loop < commands.length ; ) {
             uint8 command = uint8(commands[loop]);
             unchecked { ++loop; }
@@ -49,66 +50,102 @@ contract SmartBatcher {
                 if (command < 2) {
                     // Call
                     if (command < 1) {
-                        address target;
-                        uint256 value;
-                        bool required = memoryData[52] != 0;
-                        assembly ("memory-safe") {
-                            let offset := add(memoryData, 0x20)
-                            target := shr(96, mload(offset))
-                            value := mload(add(offset, 20))
-                        }
                         bool success;
-                        (success, outputs[outputIndex]) = target.call{value : value}(_slice(53, memoryData.length, memoryData));
+                        bool required;
+                        if (useOutput) {
+                            useOutput = false;
+                            address target;
+                            uint256 value;
+                            required = memoryData[52] != 0;
+                            assembly ("memory-safe") {
+                                let offset := add(memoryData, 0x20)
+                                target := shr(96, mload(offset))
+                                value := mload(add(offset, 20))
+                            }
+                            (success, outputs[outputIndex]) = target.call{value : value}(_slice(53, memoryData.length, memoryData));
+                        } else {
+                            bytes calldata input = inputs[inputIndex];
+                            address target = address(bytes20(input[0 : 20]));
+                            uint256 value = uint256(bytes32(input[20 : 52]));
+                            required = input[52] != 0;
+                            (success, outputs[outputIndex]) = target.call{value : value}(input[53 : ]);
+                        }
                         if (!required) require(success, CallFailed(outputs[outputIndex]));
+                        unchecked { ++inputIndex; }
                         unchecked { ++outputIndex; }
                     // StaticCall
                     } else {
-                        address target;
-                        bool required = (memoryData[20] != 0);
-                        assembly ("memory-safe") {
-                            let offset := add(memoryData, 0x20)
-                            target := shr(96, mload(offset))
-                        }
                         bool success;
-                        (success, outputs[outputIndex]) = target.staticcall((_slice(21, memoryData.length, memoryData)));
+                        bool required;
+                        if (loop > 0 && useOutput) {
+                            useOutput = false;
+                            address target;
+                            required = (memoryData[20] != 0);
+                            assembly ("memory-safe") {
+                                let offset := add(memoryData, 0x20)
+                                target := shr(96, mload(offset))
+                            }
+                            (success, outputs[outputIndex]) = target.staticcall((_slice(21, memoryData.length, memoryData)));
+                        } else {
+                            bytes calldata input = inputs[inputIndex];
+                            address target = address(bytes20(input[0 : 20]));
+                            required = input[21] != 0;
+                            (success, outputs[outputIndex]) = target.staticcall(input[21 : ]);
+                        }
                         if (!required) require(success, CallFailed(outputs[outputIndex]));
+                        unchecked { ++inputIndex; }
                         unchecked { ++outputIndex; }
                     }
                 } else {
                     // SubCall
                     if (command < 3) {
-                        bool required = (memoryData[0] != 0);
-                        subCallEntry = true;
                         bool success;
-                        (success, outputs[outputIndex]) = SELF.delegatecall((_slice(1, memoryData.length, memoryData)));
-                        if (!required) require(success, CallFailed(outputs[outputIndex]));
+                        bool required;
+                        if (loop > 0 && useOutput) {
+                            useOutput = false;
+                            required = (memoryData[0] != 0);
+                            subCallEntry = true;
+                            (success, outputs[outputIndex]) = SELF.delegatecall((_slice(1, memoryData.length, memoryData)));
+                            if (!required) require(success, CallFailed(outputs[outputIndex]));
+                            subCallEntry = false;
+                        } else {
+                            bytes calldata input = inputs[inputIndex];
+                            required = input[0] != 0;
+                            subCallEntry = true;
+                            (success, outputs[outputIndex]) = SELF.delegatecall(input[1 : ]);
+                            if (!required) require(success, CallFailed(outputs[outputIndex]));
+                            subCallEntry = false;
+                        }
                         require(outputs[outputIndex].length > 0, InvalidSubFrame());
-                        subCallEntry = false;
-                        unchecked { ++outputIndex; }
-                    // Input
-                    } else {
-                        memoryData = bytes.concat(memoryData, inputs[inputIndex]);
                         unchecked { ++inputIndex; }
+                        unchecked { ++outputIndex; }
+                    // Output
+                    } else {
+                        unchecked {
+                            uint8 nextCommand = uint8(commands[loop + 1]);
+                            require(nextCommand < 3);
+                        }
+                        useOutput = true;
+                        bytes calldata input = inputs[inputIndex];
+                        unchecked { ++inputIndex; }
+                        require(input.length & 32 == 0);
+                        for (uint256 i = 0 ; i < input.length >> 5 ; ) {
+                            uint24 index = uint24(bytes3(input[0 : 3]));
+                            uint24 start = uint24(bytes3(input[3 : 6]));
+                            uint24 end = uint24(bytes3(input[6 : 9]));
+                            if (start == end) {
+                                start = 0;
+                                end = uint24(outputs[index].length);
+                            }
+                            assembly ("memory-safe") {}
+                        }
+                        //memoryData = bytes.concat(memoryData, _slice(start, end, outputs[index]));
                     }
                 }
             } else {
                 if (command < 6) {
                     // Output
                     if (command < 5) {
-                        bytes calldata input = inputs[inputIndex];
-                        unchecked { ++inputIndex; }
-                        uint24 index = uint24(bytes3(input[0 : 3]));
-                        uint24 start = uint24(bytes3(input[3 : 6]));
-                        uint24 end = uint24(bytes3(input[6 : 9]));
-                        if (start == end) {
-                            start = 0;
-                            end = uint24(outputs[index].length);
-                        }
-                        memoryData = bytes.concat(memoryData, _slice(start, end, outputs[index]));
-                    // ResetInput
-                    } else {
-                        memoryData = inputs[inputIndex];
-                        unchecked { ++inputIndex; }
                     }
                 } else revert InvalidCommand(command);
             }
