@@ -103,7 +103,7 @@ contract SmartCall is ISmartCall {
                 } else {
                     useOutput = true;
                     bytes calldata input = inputs[i];
-                    require(input.length % 32 == 0, InvalidBytesLengthToDecode(input.length));
+                    require(input.length > 0 && input.length % 32 == 0, InvalidBytesLengthToDecode(input.length));
                     _calldatacopy(input, runtimeInput);
                     for (uint256 j = 0 ; j < inputs[i].length ; ) {
                         unchecked {
