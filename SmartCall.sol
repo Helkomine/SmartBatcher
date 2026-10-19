@@ -7,12 +7,12 @@ bytes1 constant SUBCALL = 0x02;
 bytes1 constant OUTPUT = 0x03;
 
 interface ISmartCall {
-    function smartCall(bytes calldata commands, bytes[] calldata inputs) external payable returns (Output[] memory outputs);
-
     struct Output {
         bool success;
         bytes returnData;
     }
+
+    function smartCall(bytes calldata commands, bytes[] calldata inputs) external payable returns (Output[] memory outputs);
 }
 
 contract SmartCall is ISmartCall {
