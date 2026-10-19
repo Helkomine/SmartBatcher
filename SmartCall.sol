@@ -6,7 +6,16 @@ bytes1 constant STATICCALL = 0x01;
 bytes1 constant SUBCALL = 0x02;
 bytes1 constant OUTPUT = 0x03;
 
-contract SmartCall {
+interface ISmartCall {
+    function smartCall(bytes calldata commands, bytes[] calldata inputs) external payable returns (Output[] memory outputs);
+
+    struct Output {
+        bool success;
+        bytes returnData;
+    }
+}
+
+contract SmartCall is ISmartCall {
     address immutable SELF = address(this);
 
     error LengthMismatch();
@@ -19,17 +28,7 @@ contract SmartCall {
     error CallFailed(Output reason);
     error InvalidRange(uint256 start, uint256 end);
 
-    struct Output {
-        bool success;
-        bytes returnData;
-    }
-
-    function smartCall(
-        bytes calldata commands,
-        bytes[] calldata inputs
-    ) external payable returns (
-        Output[] memory outputs
-    ) {
+    function smartCall(bytes calldata commands, bytes[] calldata inputs) external payable returns (Output[] memory outputs) {
         _allocate(commands, inputs, outputs);
         uint256 callIndex;
         bytes[] memory runtimeInputs = new bytes[](inputs.length);
@@ -134,11 +133,7 @@ contract SmartCall {
         }
     }
 
-    function _allocate(
-        bytes calldata commands,
-        bytes[] calldata inputs,
-        Output[] memory outputs
-    ) internal pure {
+    function _allocate(bytes calldata commands, bytes[] calldata inputs, Output[] memory outputs) internal pure {
         require(commands.length == inputs.length, LengthMismatch());
         uint256 outputLength;
         unchecked {
@@ -161,7 +156,7 @@ contract SmartCall {
             output := mload(0x40)
             mstore(output, length)
             mcopy(add(output, 0x20), add(add(input, 0x20), start), length)
-            mstore(0x40, add(add(output, 0x20), and(add(length, 0x1f), not(0x1f))))
+            mstore(0x40, add(add(output, 0x20), and(add(length, 0x1f), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)))
         }
     }
 }
