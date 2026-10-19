@@ -15,7 +15,7 @@ interface ISmartCall {
     function smartCall(bytes calldata commands, bytes[] calldata inputs) external payable returns (Output[] memory outputs);
 }
 
-abstract contract SmartCall is ISmartCall {
+contract SmartCall is ISmartCall {
     address immutable SELF = address(this);
 
     error LengthMismatch();
@@ -29,10 +29,10 @@ abstract contract SmartCall is ISmartCall {
     error InvalidRange(uint256 start, uint256 end);
 
     function smartCall(bytes calldata commands, bytes[] calldata inputs) external payable returns (Output[] memory outputs) {
-        _allocate(commands, inputs, outputs);
         bool useOutput;
         uint256 callIndex;
         bytes memory runtimeInput;
+        _allocate(commands, inputs, outputs, runtimeInput);
         for (uint256 i = 0 ; i < commands.length ; ) {
             bytes1 command = commands[i];
             if (command < SUBCALL) {
@@ -104,8 +104,7 @@ abstract contract SmartCall is ISmartCall {
                     useOutput = true;
                     bytes calldata input = inputs[i];
                     require(input.length % 32 == 0, InvalidBytesLengthToDecode(input.length));
-                    uint256 nextIndex;
-                    unchecked { nextIndex = i + 1; }
+                    _calldatacopy(input, runtimeInput);
                     for (uint256 j = 0 ; j < inputs[i].length ; ) {
                         unchecked {
                             uint256 word = uint256(bytes32(input[j : j + 32]));
@@ -116,9 +115,8 @@ abstract contract SmartCall is ISmartCall {
                             bytes memory output = outputs[index].returnData;
                             require(index < callIndex, TooSoonIndex());
                             require(start <= end, InvalidRange(start, end));
-                            uint256 length = end - start;
-                            require(dest + length <= runtimeInput.length, CopyOutOfRange());
-                            assembly ("memory-safe") { mcopy(add(add(runtimeInput, 0x20), dest), add(add(output, 0x20), start), length) }
+                            require(dest + (end - start) <= runtimeInput.length, CopyOutOfRange());
+                            assembly ("memory-safe") { mcopy(add(add(runtimeInput, 0x20), dest), add(add(output, 0x20), start), sub(end, start)) }
                             j += 32;
                         }
                     }
@@ -128,9 +126,10 @@ abstract contract SmartCall is ISmartCall {
         }
     }
 
-    function _allocate(bytes calldata commands, bytes[] calldata inputs, Output[] memory outputs) internal pure {
+    function _allocate(bytes calldata commands, bytes[] calldata inputs, Output[] memory outputs, bytes memory runtimeInput) internal pure {
         require(commands.length == inputs.length, LengthMismatch());
         uint256 outputLength;
+        uint256 maxLength;
         unchecked {
             for (uint256 i = 0 ; i < commands.length ; ++i) {
                 bytes1 command = commands[i];
@@ -139,8 +138,10 @@ abstract contract SmartCall is ISmartCall {
                     if (i + 1 < commands.length) require(commands[i + 1] < OUTPUT, CallAfter());
                     else revert NextIndexOutOfBound(i + 1);
                 else revert InvalidCommand(command);
+                maxLength = _max(maxLength, inputs.length);
             }
             outputs = new Output[](outputLength);
+            runtimeInput = new bytes(maxLength);
         }
     }
 
@@ -153,5 +154,16 @@ abstract contract SmartCall is ISmartCall {
             mcopy(add(output, 0x20), add(add(input, 0x20), start), length)
             mstore(0x40, add(add(output, 0x20), and(add(length, 0x1f), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)))
         }
+    }
+
+    function _calldatacopy(bytes calldata from, bytes memory to) internal pure {
+        assembly ("memory-safe") {
+            mstore(to, from.length)
+            calldatacopy(add(to, 0x20), from.offset, from.length)
+        }
+    }
+
+    function _max(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a > b ? a : b;
     }
 }
