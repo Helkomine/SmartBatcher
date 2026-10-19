@@ -50,7 +50,7 @@ abstract contract SmartCall is ISmartCall {
                         }
                         Output memory output = outputs[callIndex];
                         (output.success, output.returnData) = target.call{value : value}(data);
-                        if (allowFailure) require(output.success, CallFailed(output));
+                        if (!allowFailure) require(output.success, CallFailed(output));
                     } else {
                         address target = address(bytes20(inputs[i][0 : 20]));
                         uint256 value = uint256(bytes32(inputs[i][20 : 52]));
@@ -58,7 +58,7 @@ abstract contract SmartCall is ISmartCall {
                         bytes calldata data = inputs[i][53 : ];
                         Output memory output = outputs[callIndex];
                         (output.success, output.returnData) = target.call{value : value}(data);
-                        if (allowFailure) require(output.success, CallFailed(output));
+                        if (!allowFailure) require(output.success, CallFailed(output));
                     }
                 } else {
                     if (useOutput) {
@@ -72,14 +72,14 @@ abstract contract SmartCall is ISmartCall {
                         }
                         Output memory output = outputs[callIndex];
                         (output.success, output.returnData) = target.staticcall(data);
-                        if (allowFailure) require(output.success, CallFailed(output));
+                        if (!allowFailure) require(output.success, CallFailed(output));
                     } else {
                         address target = address(bytes20(inputs[i][0 : 20]));
                         bool allowFailure = inputs[i][20] != 0;
                         bytes calldata data = inputs[i][21 : ];
                         Output memory output = outputs[callIndex];
                         (output.success, output.returnData) = target.staticcall(data);
-                        if (allowFailure) require(output.success, CallFailed(output));
+                        if (!allowFailure) require(output.success, CallFailed(output));
                     }
                 }
                 unchecked { ++callIndex; }
@@ -91,13 +91,13 @@ abstract contract SmartCall is ISmartCall {
                         bytes memory data = _slice(1, runtimeInput.length, runtimeInput);
                         Output memory output = outputs[callIndex];
                         (output.success, output.returnData) = SELF.delegatecall(data);
-                        if (allowFailure) require(output.success, CallFailed(output));
+                        if (!allowFailure) require(output.success, CallFailed(output));
                     } else {
                         bool allowFailure = inputs[i][0] != 0;
                         bytes calldata data = inputs[i][1 : ];
                         Output memory output = outputs[callIndex];
                         (output.success, output.returnData) = SELF.delegatecall(data);
-                        if (allowFailure) require(output.success, CallFailed(output));
+                        if (!allowFailure) require(output.success, CallFailed(output));
                     }
                     unchecked { ++callIndex; }
                 } else {
