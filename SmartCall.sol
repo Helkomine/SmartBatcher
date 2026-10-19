@@ -121,9 +121,7 @@ contract SmartCall is ISmartCall {
                             require(start <= end, InvalidRange(start, end));
                             uint256 length = end - start;
                             require(dest + length <= runtimeInput.length, CopyOutOfRange());
-                            assembly ("memory-safe") {
-                                mcopy(add(add(runtimeInput, 0x20), dest), add(add(output, 0x20), start), length)
-                            }
+                            assembly ("memory-safe") { mcopy(add(add(runtimeInput, 0x20), dest), add(add(output, 0x20), start), length) }
                             j += 32;
                         }
                     }
