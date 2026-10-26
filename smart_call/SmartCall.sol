@@ -43,28 +43,30 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
             revert LengthMismatch();
         }
 
-        uint256 count;
+        {
+            uint256 count;
 
-        // Validate command structure and count output entries.
-        for (uint256 i; i < commands.length; ++i) {
-            bytes1 command = commands[i];
+            // Validate command structure and count output entries.
+            for (uint256 i; i < commands.length; ++i) {
+                bytes1 command = commands[i];
 
-            if (
-                command == CALL ||
-                command == STATICCALL ||
-                command == SELFCALL
-            ) {
-                ++count;
-            } else if (command == RETURN) {
-                if (i + 1 != commands.length) {
-                    revert ReturnMustBeLast();
+                if (
+                    command == CALL ||
+                    command == STATICCALL ||
+                    command == SELFCALL
+                ) {
+                    ++count;
+                } else if (command == RETURN) {
+                    if (i + 1 != commands.length) {
+                        revert ReturnMustBeLast();
+                    }
+                } else if (command != INPUT && command != OUTPUT) {
+                    revert InvalidCommand(command);
                 }
-            } else if (command != INPUT && command != OUTPUT) {
-                revert InvalidCommand(command);
             }
-        }
 
-        outputs = new Output[](count);
+            outputs = new Output[](count);
+        }
 
         uint256 callIndex;
         bytes memory buffer;
