@@ -6,8 +6,9 @@ import "./Commands.sol";
 import "./ISmartCall.sol";
 import "./SmartCallPure.sol";
 import "./SmartCallState.sol";
+import "./ValidateAccess.sol";
 
-contract SmartCall is ISmartCall, SmartCallPure, SmartCallState {
+contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess {
     address immutable SELF = address(this);
 
     error LengthMismatch();
@@ -20,9 +21,8 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState {
     error InvalidRange(uint256 start, uint256 end);
     error CallFailed(Output[] outputs);
     error CallInvalid(Output[] outputs);
-    error InvalidAccess();
 
-    function smartCall(bytes calldata commands, bytes[] calldata inputs) external payable returns (Output[] memory outputs) {
+    function smartCall(bytes calldata commands, bytes[] calldata inputs) external payable validateAccess returns (Output[] memory outputs) {
         bool useOutput;
         uint256 callIndex;
         bytes memory runtimeInput;
