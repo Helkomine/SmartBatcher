@@ -33,15 +33,12 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
     function smartCall(
         bytes calldata commands,
         bytes[] calldata inputs
-    )
-        external
-        payable
-        validateAccess
-        returns (Output[] memory outputs)
-    {
+    ) external payable validateAccess returns (
+        Output[] memory outputs
+    ) {
         require(commands.length == inputs.length, LengthMismatch());
 
-        {
+        unchecked {
             uint256 count;
 
             // Validate command structure and count output entries.
@@ -61,177 +58,141 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
         bytes memory buffer;
         bool hasPendingInput;
 
-        for (uint256 i; i < commands.length; ++i) {
-            bytes1 command = commands[i];
+        unchecked {
+            for (uint256 i; i < commands.length; ++i) {
+                bytes1 command = commands[i];
+                bytes memory input;
 
-            if (command == INPUT) {
-                buffer = _append(buffer, inputs[i]);
-                hasPendingInput = true;
-                continue;
-            }
-
-            if (command == OUTPUT) {
-                bytes calldata directive = inputs[i];
-
-                if (directive.length != 12) {
-                    revert InvalidOutputDirective();
-                }
-
-                uint256 index = uint32(bytes4(directive[0:4]));
-                uint256 start = uint32(bytes4(directive[4:8]));
-                uint256 end = uint32(bytes4(directive[8:12]));
-
-                if (index >= callIndex) {
-                    revert InvalidOutputIndex();
-                }
-
-                bytes memory source = outputs[index].returnData;
-
-                if (start > end) {
-                    revert InvalidOutputRange();
-                }
-
-                // Equal bounds select the entire returndata.
-                if (start == end) {
-                    buffer = _append(buffer, source);
-                } else {
-                    if (end > source.length) {
-                        revert InvalidOutputRange();
+                if (command < INPUT) {
+                    if (hasPendingInput) input = _append(buffer, inputs[i]);
+                    else {
+                        input = inputs[i];
+                        if (input.length > MAX_BUFFER_LENGTH) revert BufferTooLarge();
                     }
 
-                    buffer = _append(
-                        buffer,
-                        _slice(source, start, end)
-                    );
-                }
+                    address target;
+                    uint256 value;
+                    bool allowFailure;
+                    bytes memory data;
+                    Output memory output;
 
-                hasPendingInput = true;
-                continue;
-            }
+                    if (command < SELFCALL) {
+                        // CALL
+                        if (command < STATICCALL) {
+                            if (input.length < 53) revert InvalidInputLength();
 
-            // CALL, STATICCALL, SELFCALL, or RETURN.
-            bytes memory input;
+                            assembly ("memory-safe") {
+                                target := shr(96, mload(add(input, 0x20)))
+                                value := mload(add(input, 0x34))
+                            }
 
-            if (hasPendingInput) {
-                input = _append(buffer, inputs[i]);
-            } else {
-                input = inputs[i];
-                if (input.length > MAX_BUFFER_LENGTH) {
-                    revert BufferTooLarge();
-                }
-            }
+                            allowFailure = _decodeBool(uint8(input[52]));
 
-            if (command == RETURN) {
-                assembly ("memory-safe") {
-                    return(add(input, 0x20), mload(input))
-                }
-            }
+                            if (target == SELF) revert InvalidSelfTarget();
 
-            address target;
-            uint256 value;
-            bool allowFailure;
-            bytes memory data;
-            bool success;
-            bytes memory returnData;
+                            data = _slice(input, 53, input.length);
 
-            if (command == CALL) {
-                if (input.length < 53) {
-                    revert InvalidInputLength();
-                }
+                            (output.success, output.returnData) = target.call{value: value}(data);
+                        // STATICCALL
+                        } else {
+                            if (input.length < 21) revert InvalidInputLength();
 
-                assembly ("memory-safe") {
-                    target := shr(96, mload(add(input, 0x20)))
-                    value := mload(add(input, 0x34))
-                }
+                            assembly ("memory-safe") {
+                                target := shr(96, mload(add(input, 0x20)))
+                            }
 
-                allowFailure = _decodeBool(uint8(input[52]));
+                            allowFailure = _decodeBool(uint8(input[20]));
 
-                if (target == SELF) {
-                    revert InvalidSelfTarget();
-                }
+                            if (target == SELF) revert InvalidSelfTarget();
 
-                data = _slice(input, 53, input.length);
+                            data = _slice(input, 21, input.length);
 
-                (success, returnData) =
-                    target.call{value: value}(data);
+                            (output.success, output.returnData) = target.staticcall(data);
+                        }
+                    } else {
+                        // SELFCALL
+                        if (command < RETURN) {
+                            if (input.length < 1) revert InvalidInputLength();
 
-            } else if (command == STATICCALL) {
-                if (input.length < 21) {
-                    revert InvalidInputLength();
-                }
+                            allowFailure = _decodeBool(uint8(input[0]));
+                            data = _slice(input, 1, input.length);
 
-                assembly ("memory-safe") {
-                    target := shr(96, mload(add(input, 0x20)))
-                }
+                            _authorizeSelfCall();
 
-                allowFailure = _decodeBool(uint8(input[20]));
+                            (output.success, output.returnData) = SELF.delegatecall(data);
 
-                if (target == SELF) {
-                    revert InvalidSelfTarget();
-                }
+                            _clearSelfCallAuthorization();
+                        // RETURN
+                        } else {
+                            assembly ("memory-safe") {
+                                return(add(input, 0x20), mload(input))
+                            }
+                        }
+                    }
 
-                data = _slice(input, 21, input.length);
+                    outputs[callIndex++] = output;
 
-                (success, returnData) = target.staticcall(data);
+                    if (!output.success) {
+                        Output[] memory prefix = _prefix(outputs, callIndex);
 
-            } else {
-                // SELFCALL
-                if (input.length < 1) {
-                    revert InvalidInputLength();
-                }
+                        if (output.returnData.length == 0) revert CallInvalid(prefix);
 
-                allowFailure = _decodeBool(uint8(input[0]));
-                data = _slice(input, 1, input.length);
+                        if (!allowFailure) revert CallFailed(prefix);
+                    }
 
-                _authorizeSelfCall();
+                    // The consumed buffer is no longer modified.
+                    buffer = new bytes(0);
+                    hasPendingInput = false;
+                } else {
+                    // INPUT
+                    if (command < OUTPUT) buffer = _append(buffer, inputs[i]);
+                    // OUTPUT
+                    else {
+                        bytes calldata directive = inputs[i];
 
-                (success, returnData) = SELF.delegatecall(data);
+                        if (directive.length != 12) revert InvalidOutputDirective();
 
-                _clearSelfCallAuthorization();
-            }
+                        uint256 index = uint32(bytes4(directive[0 : 4]));
+                        uint256 start = uint32(bytes4(directive[4 : 8]));
+                        uint256 end = uint32(bytes4(directive[8 : 12]));
 
-            outputs[callIndex] = Output({
-                success: success,
-                returnData: returnData
-            });
+                        require(index < callIndex, InvalidOutputIndex());
 
-            ++callIndex;
+                        bytes memory source = outputs[index].returnData;
 
-            if (!success) {
-                Output[] memory prefix = _prefix(outputs, callIndex);
+                        if (start > end) revert InvalidOutputRange();
 
-                if (returnData.length == 0) {
-                    revert CallInvalid(prefix);
-                }
+                        // Equal bounds select the entire returndata.
+                        if (start == end) buffer = _append(buffer, source);
+                        else {
+                            if (end > source.length) revert InvalidOutputRange();
 
-                if (!allowFailure) {
-                    revert CallFailed(prefix);
+                            buffer = _append(
+                                buffer,
+                                _slice(source, start, end)
+                            );
+                        }
+                    }
+
+                    hasPendingInput = true;
                 }
             }
-
-            // The consumed buffer is no longer modified.
-            buffer = new bytes(0);
-            hasPendingInput = false;
         }
 
-        if (hasPendingInput) {
-            revert UnconsumedInput();
-        }
+        if (hasPendingInput) revert UnconsumedInput();
     }
 
     function selectBytes(
         bool choice,
         bytes calldata inputIfTrue,
         bytes calldata inputIfFalse
-    ) external payable returns (bytes memory output) {
+    ) external payable returns (
+        bytes memory output
+    ) {
         return choice ? inputIfTrue : inputIfFalse;
     }
 
-    function _decodeBool(uint8 value)
-        private
-        pure
-        returns (bool)
-    {
+    function _decodeBool(uint8 value) private pure returns (bool) {
         if (value > 1) revert InvalidAllowFailure();
         return value == 1;
     }
@@ -239,18 +200,9 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
     function _append(
         bytes memory current,
         bytes memory part
-    )
-        private
-        pure
-        returns (bytes memory)
-    {
-        if (current.length > MAX_BUFFER_LENGTH) {
-            revert BufferTooLarge();
-        }
-
-        if (part.length > MAX_BUFFER_LENGTH - current.length) {
-            revert BufferTooLarge();
-        }
+    ) private pure returns (bytes memory) {
+        if (current.length > MAX_BUFFER_LENGTH) revert BufferTooLarge();
+        if (part.length > MAX_BUFFER_LENGTH - current.length) revert BufferTooLarge();
 
         return bytes.concat(current, part);
     }
@@ -259,14 +211,10 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
         bytes memory source,
         uint256 start,
         uint256 end
-    )
-        private
-        pure
-        returns (bytes memory result)
-    {
-        if (start > end || end > source.length) {
-            revert InvalidOutputRange();
-        }
+    ) private pure returns (
+        bytes memory result
+    ) {
+        if (start > end || end > source.length) revert InvalidOutputRange();
 
         uint256 length = end - start;
         result = new bytes(length);
@@ -283,15 +231,11 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
     function _prefix(
         Output[] memory source,
         uint256 length
-    )
-        private
-        pure
-        returns (Output[] memory result)
-    {
+    ) private pure returns (
+        Output[] memory result
+    ) {
         result = new Output[](length);
 
-        for (uint256 i; i < length; ++i) {
-            result[i] = source[i];
-        }
+        for (uint256 i; i < length; ++i) result[i] = source[i];
     }
 }
