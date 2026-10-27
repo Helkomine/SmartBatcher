@@ -369,6 +369,9 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
     error CallFailed(Output[] outputs);
     error CallInvalid(Output[] outputs);
 
+    receive() external payable {}
+    fallback() external payable {}
+
     function smartCall(
         bytes calldata commands,
         bytes[] calldata inputs
