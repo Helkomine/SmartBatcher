@@ -48,19 +48,9 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
             for (uint256 i; i < commands.length; ++i) {
                 bytes1 command = commands[i];
 
-                if (
-                    command == CALL ||
-                    command == STATICCALL ||
-                    command == SELFCALL
-                ) {
-                    ++count;
-                } else if (command == RETURN) {
-                    if (i + 1 != commands.length) {
-                        revert ReturnMustBeLast();
-                    }
-                } else if (command != INPUT && command != OUTPUT) {
-                    revert InvalidCommand(command);
-                }
+                if (command < RETURN) ++count;
+                else if (command == RETURN) require (i + 1 == commands.length, ReturnMustBeLast());
+                else if (command != INPUT && command != OUTPUT) revert InvalidCommand(command);
             }
 
             outputs = new Output[](count);
