@@ -39,9 +39,7 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
         validateAccess
         returns (Output[] memory outputs)
     {
-        if (commands.length != inputs.length) {
-            revert LengthMismatch();
-        }
+        require(commands.length == inputs.length, LengthMismatch());
 
         {
             uint256 count;
