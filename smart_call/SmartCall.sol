@@ -135,9 +135,8 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
                     if (!output.success) {
                         Output[] memory prefix = _prefix(outputs, callIndex);
 
-                        if (output.returnData.length == 0) revert CallInvalid(prefix);
-
-                        if (!allowFailure) revert CallFailed(prefix);
+                        require(output.returnData.length > 0, CallInvalid(prefix));
+                        require(allowFailure, CallFailed(prefix));
                     }
 
                     // The consumed buffer is no longer modified.
