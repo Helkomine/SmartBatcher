@@ -48,6 +48,10 @@ interface ISmartCallPure {
         uint256 highest,
         uint256 num
     ) external payable returns (bool);
+
+    /// @notice Keccak256 hash function.
+    /// @dev Returns a hash based on the given string of bytes.
+    function hash(bytes calldata data) external payable returns (bytes32);
 }
 
 /// @title SmartCallPure
@@ -171,5 +175,10 @@ abstract contract SmartCallPure is ISmartCallPure {
     ) external payable override returns (bool)
     {
         return lowest <= num && num <= highest;
+    }
+
+    /// @inheritdoc ISmartCallPure
+    function hash(bytes calldata data) external payable returns (bytes32) {
+        return keccak256(data);
     }
 }
