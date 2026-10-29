@@ -61,6 +61,8 @@ interface ISmartCallPure {
     /// @notice Keccak256 hash function.
     /// @dev Returns a hash based on the given string of bytes.
     function hash(bytes calldata data) external payable returns (bytes32);
+
+    function willRevert() external payable;
 }
 
 /// @title SmartCallPure
@@ -189,6 +191,11 @@ abstract contract SmartCallPure is ISmartCallPure {
     /// @inheritdoc ISmartCallPure
     function hash(bytes calldata data) external payable returns (bytes32) {
         return keccak256(data);
+    }
+
+    error Revert();
+    function willRevert() external payable {
+        revert Revert();
     }
 }
 
