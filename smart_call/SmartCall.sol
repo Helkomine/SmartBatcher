@@ -1,16 +1,3 @@
-// SPDX-License-Identifier: CC0-1.0
-pragma solidity ^0.8.35;
-/// @author Helkomine (@Helkomine)
-
-import "./ISmartCall.sol";
-import "./Commands.sol";
-import "./SmartCallPure.sol";
-import "./SmartCallState.sol";
-import "./ValidateAccess.sol";
-
-// Core implementation excerpt.
-// Inherit ISmartCall, SmartCallPure, SmartCallState,
-// and ValidateAccess as in the existing contract.
 contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess {
     uint256 constant MAX_BUFFER_LENGTH = type(uint32).max;
 
@@ -29,6 +16,9 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
     error ReturnMustBeLast();
     error CallFailed(Output[] outputs);
     error CallInvalid(Output[] outputs);
+
+    receive() external payable {}
+    fallback() external payable {}
 
     function smartCall(
         bytes calldata commands,
