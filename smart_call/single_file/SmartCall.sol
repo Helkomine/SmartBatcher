@@ -360,7 +360,7 @@ interface ISmartCall {
         bool choice,
         bytes calldata inputIfTrue,
         bytes calldata inputIfFalse
-    ) external payable returns (bytes memory output);
+    ) external payable;
 }
 
 // Core implementation excerpt.
@@ -543,10 +543,17 @@ contract SmartCall is ISmartCall, SmartCallPure, SmartCallState, ValidateAccess 
         bool choice,
         bytes calldata inputIfTrue,
         bytes calldata inputIfFalse
-    ) external payable returns (
-        bytes memory output
-    ) {
-        return choice ? inputIfTrue : inputIfFalse;
+    ) external payable {
+        assembly ("memory-safe") {
+            switch choice
+            case 0 {
+                calldatacopy(0, inputIfFalse.offset, inputIfFalse.length)
+                return(0, inputIfFalse.length)
+            } default {
+                calldatacopy(0, inputIfTrue.offset, inputIfTrue.length)
+                return(0, inputIfTrue.length)
+            }
+        }
     }
 
     function _decodeBool(uint8 value) private pure returns (bool) {
