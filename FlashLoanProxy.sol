@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC0-1.0
 pragma solidity ^0.8.35;
 
-contract SmartFlashLoan {
+contract FlashLoanProxy {
     /**
      * @dev Maximum number of bytes that a cache entry can contain.
      *
