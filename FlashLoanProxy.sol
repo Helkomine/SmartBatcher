@@ -10,12 +10,6 @@ contract FlashLoanProxy {
      */
     uint64 constant MAX_TOTAL_LENGTH = type(uint64).max;
 
-    /**
-     * @dev Mask used to extract the lower 128-bit `length` field from
-     *      `sliceInfo`.
-     */
-    uint256 constant SLICE_INFO_MASKING = type(uint128).max;
-
     uint256 constant DEPTH_SLOT = erc7201("depth.slot");
 
     uint256 constant BYTECODE_SLOT = erc7201("bytecode.slot");
