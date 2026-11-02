@@ -175,13 +175,10 @@ contract FlashLoanProxy {
                 totalCacheSlot := shr(5, _cacheLength)
             }
             tstore(namespace, length)
-            {
-                let _namespace := add(namespace, 1)
-                if gt(namespace, _namespace) {
-                    mstore(0, overflowSelector)
-                    revert(0, 4)
-                }
-                namespace := _namespace
+            namespace := add(namespace, 1)
+            if gt(1, namespace) {
+                mstore(0, overflowSelector)
+                revert(0, 4)
             }
             if length {
                 let floorTotalSlot := shr(5, length)
@@ -260,17 +257,14 @@ contract FlashLoanProxy {
                 let floorTotalSlot := shr(5, length)
                 let totalSlot := shr(5, add(length, 31))
                 let lastSlot := add(namespace, floorTotalSlot)
-                {
-                    let _namespace := add(namespace, 1)
-                    if gt(namespace, _namespace) {
-                        mstore(0, overflowSelector)
-                        revert(0, 4)
-                    }
-                    namespace := _namespace
-                    if gt(namespace, lastSlot) {
-                        mstore(0, overflowSelector)
-                        revert(0, 4)
-                    }
+                if gt(namespace, lastSlot) {
+                    mstore(0, overflowSelector)
+                    revert(0, 4)
+                }
+                namespace := add(namespace, 1)
+                if gt(1, namespace) {
+                    mstore(0, overflowSelector)
+                    revert(0, 4)
                 }
                 for { let i } lt(i, floorTotalSlot) { i := add(i, 1) } {
                     mstore(add(offset, shl(5, i)), tload(add(namespace, i)))
