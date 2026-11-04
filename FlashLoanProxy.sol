@@ -16,6 +16,8 @@ contract FlashLoanProxy {
 
     uint256 constant CALLDATA_SLOT = erc7201("calldata.slot");
 
+    uint16 constant GAS_STIPEND = 2300;
+
     address immutable IMPLEMENTATION;
 
     /**
@@ -39,36 +41,38 @@ contract FlashLoanProxy {
     }
 
     fallback() external payable {
-        uint256 depth = _tload(bytes32(DEPTH_SLOT));
-        _tstore(bytes32(DEPTH_SLOT), ++depth);
-        if (depth == 1) {
-            (bytes calldata bytecode, bytes calldata data) = _decodeRawBytes(msg.data);
-            _setCacheCallData(bytes32(BYTECODE_SLOT), bytecode);
-            _setCacheCallData(bytes32(CALLDATA_SLOT), data);
-            (bool success, bytes memory retData) = IMPLEMENTATION.delegatecall(bytecode);
-            if (success) {
-                unchecked { _tstore(bytes32(DEPTH_SLOT), --depth); }
-                _setCacheCallData(bytes32(BYTECODE_SLOT), _emptyBytesCalldata());
-                _setCacheCallData(bytes32(CALLDATA_SLOT), _emptyBytesCalldata());
-                assembly ("memory-safe") {
-                    return(add(retData, 0x20), mload(retData))
+        if (gasleft() > GAS_STIPEND) {
+            uint256 depth = _tload(bytes32(DEPTH_SLOT));
+            _tstore(bytes32(DEPTH_SLOT), ++depth);
+            if (depth == 1) {
+                (bytes calldata bytecode, bytes calldata data) = _decodeRawBytes(msg.data);
+                _setCacheCallData(bytes32(BYTECODE_SLOT), bytecode);
+                _setCacheCallData(bytes32(CALLDATA_SLOT), data);
+                (bool success, bytes memory retData) = IMPLEMENTATION.delegatecall(bytecode);
+                if (success) {
+                    unchecked { _tstore(bytes32(DEPTH_SLOT), --depth); }
+                    _setCacheCallData(bytes32(BYTECODE_SLOT), _emptyBytesCalldata());
+                    _setCacheCallData(bytes32(CALLDATA_SLOT), _emptyBytesCalldata());
+                    assembly ("memory-safe") {
+                        return(add(retData, 0x20), mload(retData))
+                    }
+                } else {
+                    assembly ("memory-safe") {
+                        revert(add(retData, 0x20), mload(retData))
+                    }
                 }
             } else {
-                assembly ("memory-safe") {
-                    revert(add(retData, 0x20), mload(retData))
-                }
-            }
-        } else {
-            _setCacheCallData(bytes32(CALLDATA_SLOT), msg.data);
-            (bool success, bytes memory retData) = IMPLEMENTATION.delegatecall(_getCacheData(bytes32(BYTECODE_SLOT)));
-            if (success) {
-                unchecked { _tstore(bytes32(DEPTH_SLOT), --depth); }
-                assembly ("memory-safe") {
-                    return(add(retData, 0x20), mload(retData))
-                }
-            } else {
-                assembly ("memory-safe") {
-                    revert(add(retData, 0x20), mload(retData))
+                _setCacheCallData(bytes32(CALLDATA_SLOT), msg.data);
+                (bool success, bytes memory retData) = IMPLEMENTATION.delegatecall(_getCacheData(bytes32(BYTECODE_SLOT)));
+                if (success) {
+                    unchecked { _tstore(bytes32(DEPTH_SLOT), --depth); }
+                    assembly ("memory-safe") {
+                        return(add(retData, 0x20), mload(retData))
+                    }
+                } else {
+                    assembly ("memory-safe") {
+                        revert(add(retData, 0x20), mload(retData))
+                    }
                 }
             }
         }
