@@ -10,7 +10,7 @@ contract FlashLoanProxy {
      */
     uint64 constant MAX_TOTAL_LENGTH = type(uint64).max;
 
-    uint256 constant HANDLE_SLOT = erc7201("handle.slot");
+    uint256 constant HANDLER_SLOT = erc7201("handler.slot");
 
     uint256 constant DEPTH_SLOT = erc7201("depth.slot");
 
@@ -41,7 +41,7 @@ contract FlashLoanProxy {
     }
 
     fallback() external payable {
-        if (_tload(bytes32(HANDLE_SLOT)) != 0) {
+        if (_tload(bytes32(HANDLER_SLOT)) != 0) {
             uint256 depth = _tload(bytes32(DEPTH_SLOT));
             _tstore(bytes32(DEPTH_SLOT), ++depth);
             if (depth == 1) {
@@ -50,6 +50,7 @@ contract FlashLoanProxy {
                 _setCacheCallData(bytes32(CALLDATA_SLOT), data);
                 (bool success, bytes memory retData) = IMPLEMENTATION.delegatecall(bytecode);
                 if (success) {
+                    _tstore(bytes32(HANDLER_SLOT), 0);
                     unchecked { _tstore(bytes32(DEPTH_SLOT), --depth); }
                     _setCacheCallData(bytes32(BYTECODE_SLOT), _emptyBytesCalldata());
                     _setCacheCallData(bytes32(CALLDATA_SLOT), _emptyBytesCalldata());
