@@ -44,37 +44,25 @@ contract FlashLoanProxy {
         if (_tload(bytes32(HANDLER_SLOT)) != 0) {
             uint256 depth = _tload(bytes32(DEPTH_SLOT));
             _tstore(bytes32(DEPTH_SLOT), ++depth);
+            bool success;
+            bytes memory retData;
             if (depth == 1) {
                 (bytes calldata bytecode, bytes calldata data) = _decodeRawBytes(msg.data);
                 _setCacheCallData(bytes32(BYTECODE_SLOT), bytecode);
                 _setCacheCallData(bytes32(CALLDATA_SLOT), data);
-                (bool success, bytes memory retData) = IMPLEMENTATION.delegatecall(bytecode);
-                if (success) {
-                    _tstore(bytes32(HANDLER_SLOT), 0);
-                    unchecked { _tstore(bytes32(DEPTH_SLOT), --depth); }
-                    _setCacheCallData(bytes32(BYTECODE_SLOT), _emptyBytesCalldata());
-                    _setCacheCallData(bytes32(CALLDATA_SLOT), _emptyBytesCalldata());
-                    assembly ("memory-safe") {
-                        return(add(retData, 0x20), mload(retData))
-                    }
-                } else {
-                    assembly ("memory-safe") {
-                        revert(add(retData, 0x20), mload(retData))
-                    }
-                }
+                (success, retData) = IMPLEMENTATION.delegatecall(bytecode);
+                _tstore(bytes32(HANDLER_SLOT), 0);
+                _setCacheCallData(bytes32(BYTECODE_SLOT), msg.data[0 : 0]);
+                _setCacheCallData(bytes32(CALLDATA_SLOT), msg.data[0 : 0]);
             } else {
                 _setCacheCallData(bytes32(CALLDATA_SLOT), msg.data);
-                (bool success, bytes memory retData) = IMPLEMENTATION.delegatecall(_getCacheData(bytes32(BYTECODE_SLOT)));
-                if (success) {
-                    unchecked { _tstore(bytes32(DEPTH_SLOT), --depth); }
-                    assembly ("memory-safe") {
-                        return(add(retData, 0x20), mload(retData))
-                    }
-                } else {
-                    assembly ("memory-safe") {
-                        revert(add(retData, 0x20), mload(retData))
-                    }
-                }
+                (success, retData) = IMPLEMENTATION.delegatecall(_getCacheData(bytes32(BYTECODE_SLOT)));
+            }
+            unchecked { _tstore(bytes32(DEPTH_SLOT), --depth); }
+            assembly ("memory-safe") {
+                switch success
+                case 0 { revert(add(retData, 0x20), mload(retData)) }
+                default { return(add(retData, 0x20), mload(retData)) }
             }
         }
     }
@@ -313,13 +301,6 @@ contract FlashLoanProxy {
     function _tload(bytes32 key) internal view returns (uint256 value) {
         assembly ("memory-safe") {
             value := tload(key)
-        }
-    }
-
-    function _emptyBytesCalldata() internal pure returns (bytes calldata emptyBytes) {
-        assembly ("memory-safe") {
-            emptyBytes.offset := 0
-            emptyBytes.length := 0
         }
     }
 }
