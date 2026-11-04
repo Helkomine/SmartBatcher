@@ -10,13 +10,13 @@ contract FlashLoanProxy {
      */
     uint64 constant MAX_TOTAL_LENGTH = type(uint64).max;
 
+    uint256 constant HANDLE_SLOT = erc7201("handle.slot");
+
     uint256 constant DEPTH_SLOT = erc7201("depth.slot");
 
     uint256 constant BYTECODE_SLOT = erc7201("bytecode.slot");
 
     uint256 constant CALLDATA_SLOT = erc7201("calldata.slot");
-
-    uint16 constant GAS_STIPEND = 2300;
 
     address immutable IMPLEMENTATION;
 
@@ -41,7 +41,7 @@ contract FlashLoanProxy {
     }
 
     fallback() external payable {
-        if (gasleft() > GAS_STIPEND) {
+        if (_tload(bytes32(HANDLE_SLOT)) != 0) {
             uint256 depth = _tload(bytes32(DEPTH_SLOT));
             _tstore(bytes32(DEPTH_SLOT), ++depth);
             if (depth == 1) {
