@@ -8,8 +8,7 @@ contract FlashLoanProxy {
     /**
      * @dev Maximum number of bytes that a cache entry can contain.
      *
-     * This limit protects the transient-storage cache implementation and is
-     * not part of the Solver protocol semantics.
+     * This limit protects the transient-storage cache implementation
      */
     uint64 constant MAX_TOTAL_LENGTH = type(uint64).max;
 
@@ -24,10 +23,7 @@ contract FlashLoanProxy {
     address immutable IMPLEMENTATION;
 
     /**
-     * @dev Reverts when transient-storage slot arithmetic overflows.
-     *
-     * This error protects the cache implementation and is not part of the
-     * Solver protocol semantics.
+     * @dev Reverts when arithmetic overflows.
      */
     error Overflow();
 
@@ -44,29 +40,30 @@ contract FlashLoanProxy {
     }
 
     fallback() external payable {
-        if (_tload(bytes32(HANDLER_SLOT)) != 0) {
-            uint256 depth = _tload(bytes32(DEPTH_SLOT));
-            _tstore(bytes32(DEPTH_SLOT), ++depth);
-            bool success;
-            bytes memory retData;
-            if (depth == 1) {
-                (bytes calldata bytecode, bytes calldata data) = _decodeRawBytes(msg.data);
-                _setCacheCallData(bytes32(BYTECODE_SLOT), bytecode);
-                _setCacheCallData(bytes32(CALLDATA_SLOT), data);
-                (success, retData) = IMPLEMENTATION.delegatecall(bytecode);
-                _tstore(bytes32(HANDLER_SLOT), 0);
-                _setCacheCallData(bytes32(BYTECODE_SLOT), msg.data[0 : 0]);
-                _setCacheCallData(bytes32(CALLDATA_SLOT), msg.data[0 : 0]);
-            } else {
+        uint256 depth = _tload(bytes32(DEPTH_SLOT));
+        bool success;
+        bytes memory retData;
+        if (depth == 0) {
+            unchecked { _tstore(bytes32(DEPTH_SLOT), ++depth); }
+            (bytes calldata bytecode, bytes calldata data) = _decodeRawBytes(msg.data);
+            _setCacheCallData(bytes32(BYTECODE_SLOT), bytecode);
+            _setCacheCallData(bytes32(CALLDATA_SLOT), data);
+            (success, retData) = IMPLEMENTATION.delegatecall(bytecode);
+            _tstore(bytes32(HANDLER_SLOT), 0);
+            _setCacheCallData(bytes32(BYTECODE_SLOT), msg.data[0 : 0]);
+            _setCacheCallData(bytes32(CALLDATA_SLOT), msg.data[0 : 0]);
+        } else {
+            if (_tload(bytes32(HANDLER_SLOT)) != 0) {
+                _tstore(bytes32(DEPTH_SLOT), ++depth);
                 _setCacheCallData(bytes32(CALLDATA_SLOT), msg.data);
                 (success, retData) = IMPLEMENTATION.delegatecall(_getCacheData(bytes32(BYTECODE_SLOT)));
             }
-            unchecked { _tstore(bytes32(DEPTH_SLOT), --depth); }
-            assembly ("memory-safe") {
-                switch success
-                case 0 { revert(add(retData, 0x20), mload(retData)) }
-                default { return(add(retData, 0x20), mload(retData)) }
-            }
+        }
+        unchecked { _tstore(bytes32(DEPTH_SLOT), --depth); }
+        assembly ("memory-safe") {
+            switch success
+            case 0 { revert(add(retData, 0x20), mload(retData)) }
+            default { return(add(retData, 0x20), mload(retData)) }
         }
     }
 
