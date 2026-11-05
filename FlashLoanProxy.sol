@@ -41,7 +41,7 @@ contract FlashLoanProxy {
 
     fallback() external payable {
         uint256 depth = _tload(bytes32(DEPTH_SLOT));
-        bool success;
+        bool success = true;
         bytes memory retData;
         if (depth == 0) {
             unchecked { _tstore(bytes32(DEPTH_SLOT), ++depth); }
