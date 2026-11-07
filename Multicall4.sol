@@ -35,6 +35,7 @@ interface IMulticall4 {
     }
 
     error InvalidIndex(uint64 index);
+    error CallFailed(bytes reason);
 
     function multicall(Batch[] calldata batches) external payable returns (Result[] memory results);
 }
@@ -88,6 +89,9 @@ abstract contract Multicall4 is IMulticall4 {
                 }
                 unchecked { ++j; }
             }
+            Result memory result = results[i];
+            (result.success, result.returnData) = target.call{value : value}(data);
+            require(result.success, CallFailed(result.returnData));
             unchecked { ++i; }
         }
     }
