@@ -38,7 +38,7 @@ interface IMulticall4 {
 }
 
 abstract contract Multicall4 is IMulticall4 {
-    uint64 constant SENTINEL = type(uint64).max;
+    uint64 constant SENTINEL = 1;
 
     function multicall(Batch[] calldata batches) external payable returns (Result[] memory results) {
         results = new Result[](batches.length);
@@ -75,7 +75,7 @@ abstract contract Multicall4 is IMulticall4 {
                     uint64 index = uint256(_input) >> 192;
                     uint64 start = (uint256(_input) << 64) >> 192;
                     uint64 end = (uint256(_input) << 128) >> 192;
-                    uint64 sentinel = uint256(_input) & type(uint64).max;
+                    uint64 sentinel = uint256(_input) & SENTINEL;
                     result = results[index];
                     if (sentinel == SENTINEL) {
                         data = bytes.concat(data, result.returnData[start : result.returnData.length - end]);
