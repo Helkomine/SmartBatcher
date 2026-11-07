@@ -34,21 +34,13 @@ interface IMulticall4 {
         bytes returnData;
     }
 
-    function multicall(
-        Batch[] calldata batches
-    ) external payable returns (
-        Result[] memory results
-    );
+    function multicall(Batch[] calldata batches) external payable returns (Result[] memory results);
 }
 
-contract Multicall4 is IMulticall4 {
+abstract contract Multicall4 is IMulticall4 {
     uint64 constant SENTINEL = type(uint64).max;
 
-    function multicall(
-        Batch[] calldata batches
-    ) external payable returns (
-        Result[] memory results
-    ) {
+    function multicall(Batch[] calldata batches) external payable returns (Result[] memory results) {
         results = new Result[](batches.length);
         for (uint256 i = 0 ; i < batches.length ; ) {
             Batch calldata batch = batches[i];
@@ -86,7 +78,7 @@ contract Multicall4 is IMulticall4 {
                     uint64 sentinel = uint256(_input) & type(uint64).max;
                     result = results[index];
                     if (sentinel == SENTINEL) {
-                        data = bytes.concat(data, result.returnData[start : ]);
+                        data = bytes.concat(data, result.returnData[start : result.returnData.length - end]);
                     } else {
                         data = bytes.concat(data, result.returnData[start : end];  
                     }
