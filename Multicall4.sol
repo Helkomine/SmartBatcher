@@ -75,6 +75,7 @@ abstract contract Multicall4 is IMulticall4 {
                 if (_data.route == IMulticall4.Route.RAW) {
                     data = bytes.concat(data, _data.data);
                 } else {
+                    bytes32 _input = batch.target.input;
                     uint64 index = uint256(_input) >> 192;
                     uint64 start = (uint256(_input) << 64) >> 192;
                     uint64 end = (uint256(_input) << 128) >> 192;
