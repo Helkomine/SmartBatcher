@@ -34,6 +34,8 @@ interface IMulticall4 {
         bytes returnData;
     }
 
+    error InvalidIndex(uint64 index);
+
     function multicall(Batch[] calldata batches) external payable returns (Result[] memory results);
 }
 
@@ -51,7 +53,7 @@ abstract contract Multicall4 is IMulticall4 {
                 bytes32 _input = batch.target.input;
                 uint64 index = uint256(_input) >> 192;
                 uint64 start = (uint256(_input) << 64) >> 192;
-                require(index < i);
+                require(index < i, InvalidIndex(index));
                 result = results[index];
                 target = address(bytes20(result.returnData[start : start + 20]));
             }
@@ -62,7 +64,7 @@ abstract contract Multicall4 is IMulticall4 {
                 bytes32 _input = batch.target.input;
                 uint64 index = uint256(_input) >> 192;
                 uint64 start = (uint256(_input) << 64) >> 192;
-                require(index < i);
+                require(index < i, InvalidIndex(index));
                 result = results[index];
                 target = bytes32(result.returnData[start : start + 32]);
             }
@@ -76,6 +78,7 @@ abstract contract Multicall4 is IMulticall4 {
                     uint64 start = (uint256(_input) << 64) >> 192;
                     uint64 end = (uint256(_input) << 128) >> 192;
                     uint64 sentinel = uint256(_input) & SENTINEL;
+                    require(index < i, InvalidIndex(index));
                     result = results[index];
                     if (sentinel == SENTINEL) {
                         data = bytes.concat(data, result.returnData[start : result.returnData.length - end]);
