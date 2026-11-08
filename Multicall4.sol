@@ -117,7 +117,7 @@ abstract contract Multicall4 is IMulticall4 {
             if (batch.data.operation == Operation.CALL) (result.success, result.returnData) = target.call{value : value}(data);
             else if (batch.data.operation == Operation.STATICCALL) (result.success, result.returnData) = target.staticcall(data);
             else (result.success, result.returnData) = SELF.delegatecall(data);
-            require(result.success, CallFailed(result.returnData));
+            if (!required) require(result.success, CallFailed(result.returnData));
             unchecked { ++i; }
         }
     }
