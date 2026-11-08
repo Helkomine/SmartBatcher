@@ -77,9 +77,9 @@ abstract contract Multicall4 is IMulticall4 {
                 target = address(bytes20(_slice(_result.returnData, start, start + 20)));
             }
             uint256 value;
-            if (batch.value.route == Route.RAW) value = uint256(batch.target.input);
+            if (batch.value.route == Route.RAW) value = uint256(batch.value.input);
             else {
-                bytes32 _input = batch.target.input;
+                bytes32 _input = batch.value.input;
                 uint64 index = uint64(uint256(_input) >> 192);
                 uint64 start = uint64((uint256(_input) << 64) >> 192);
                 require(index < i, InvalidIndex(index));
